@@ -1,108 +1,120 @@
 import { cardsArray } from "./data.js";
 
-let repeat = 2;
+const repeat = 2;
 
 function main() {
-  const moves = document.querySelector("#moves");
-  const score = document.querySelector("#score");
+  const movesElement = document.querySelector("#moves");
+  const scoreElement = document.querySelector("#score");
+  const gameContainer = document.querySelector("#game-container");
 
-  let canClick = true;
-  let numberOfMatch = 0;
-  let numberOfMove = 0;
-  let cardMatch = [];
-  let imageUrl = "https://taniarascia.github.io/memory/";
-  let bgImage = "img/question.gif";
+  let isInteractionEnabled = true;
+  let matchedPairsCount = 0;
+  let moveCount = 0;
+  let flippedCards = [];
+  const imageUrl = "https://taniarascia.github.io/memory/";
+  const hiddenCardImage = "img/question.gif";
 
-  const game = document.querySelector("#game-container");
-  const grid = document.createElement("div");
-  grid.className =
-    "grid grid-cols-4 gap-y-10 place-items-center  bg-blue-50 py-5";
-  game.appendChild(grid);
-
-  function updateData(element, data) {
-    let content = element.textContent.split(":");
-    content[1] = data;
-    element.textContent = content.join(": ");
+  function updateStats(element, label, value) {
+    element.textContent = `${label}: ${value}`;
   }
 
-  function createCard(data) {
-    const card = document.createElement("div");
-    card.className = `w-[10rem] h-[10rem] bg-[url('${
-      imageUrl + bgImage
-    }')] bg-contain bg-no-repeat bg-center`;
-    card.setAttribute("data-name", data.name);
-    card.setAttribute("data-image", data.img);
-    return card;
+  function generateCardElement(cardData) {
+    const cardElement = document.createElement("div");
+    cardElement.className = `w-[10rem] h-[10rem] bg-[url('${
+      imageUrl + hiddenCardImage
+    }')] bg-contain bg-no-repeat bg-center cursor-pointer`;
+    cardElement.dataset.name = cardData.name;
+    cardElement.dataset.image = cardData.img;
+    return cardElement;
   }
 
-  function createGridUi(data, root) {
-    data.forEach((element, index) => {
-      const card = createCard(element);
-      card.setAttribute("data-id", index);
-      root.appendChild(card);
+  function createGameGrid(cards, container) {
+    const gridContainer = document.createElement("div");
+    gridContainer.className =
+      "grid grid-cols-4 gap-y-10 place-items-center bg-blue-50 py-5";
+    container.appendChild(gridContainer);
+
+    cards.forEach((cardData, index) => {
+      const cardElement = generateCardElement(cardData);
+      cardElement.dataset.id = index;
+      gridContainer.appendChild(cardElement);
     });
+
+    gridContainer.addEventListener("click", handleCardFlip);
+    return gridContainer;
   }
 
-  function handleClick(event) {
-    let target = event.target;
-    if (!target.dataset.name || !canClick) {
-      return;
-    }
+  function showCard(cardElement) {
+    const cardImage = cardElement.dataset.image;
+    cardElement.classList.remove(`bg-[url('${imageUrl + hiddenCardImage}')]`);
+    cardElement.classList.add(`bg-[url('${imageUrl + cardImage}')]`);
+    cardElement.classList.add("pointer-events-none");
+  }
 
-    const image = target.dataset.image;
-    target.classList.remove(`bg-[url('${imageUrl + bgImage}')]`);
-    target.classList.add(`bg-[url('${imageUrl + image}')]`);
-    target.classList.add("pointer-events-none");
-    cardMatch.push(target);
+  function concealCard(cardElement) {
+    const cardImage = cardElement.dataset.image;
+    cardElement.classList.remove(`bg-[url('${imageUrl + cardImage}')]`);
+    cardElement.classList.add(`bg-[url('${imageUrl + hiddenCardImage}')]`);
+    cardElement.classList.remove("pointer-events-none");
+  }
 
-    if (cardMatch.length === repeat) {
-      canClick = false;
-      setTimeout(() => {
-        const matches = cardMatch.every((card) => {
-          return card.dataset.name === target.dataset.name;
-        });
-        if (matches) {
-          numberOfMatch += 1;
-          updateData(score, numberOfMatch);
-        } else {
-          cardMatch.forEach((card) => {
-            const image = card.dataset.image;
-            card.classList.remove(`bg-[url('${imageUrl + image}')]`);
-            card.classList.add(`bg-[url('${imageUrl + bgImage}')]`);
-            card.classList.remove("pointer-events-none");
-          });
-        }
-        numberOfMove += 1;
-        updateData(moves, numberOfMove);
-        cardMatch = [];
-        canClick = true;
-      }, 1000);
+  function handleCardFlip(event) {
+    const cardElement = event.target;
+    if (!cardElement.dataset.name || !isInteractionEnabled) return;
+
+    showCard(cardElement);
+    flippedCards.push(cardElement);
+
+    if (flippedCards.length === repeat) {
+      isInteractionEnabled = false;
+      setTimeout(evaluateFlippedCards, 1000);
     }
   }
 
-  function shuffleArray(data) {
-    for (let index = data.length - 1; index > 0; index--) {
-      const shuffleIndex = Math.floor(Math.random() * (index + 1));
-      [data[index], data[shuffleIndex]] = [data[shuffleIndex], data[index]];
+  function evaluateFlippedCards() {
+    const isMatch = flippedCards.every(
+      (card) => card.dataset.name === flippedCards[0].dataset.name
+    );
+
+    if (isMatch) {
+      matchedPairsCount++;
+      updateStats(scoreElement, "Score", matchedPairsCount);
+    } else {
+      flippedCards.forEach(concealCard);
     }
-    return data;
+
+    moveCount++;
+    updateStats(movesElement, "Moves", moveCount);
+    flippedCards = [];
+    isInteractionEnabled = true;
   }
 
-  grid.addEventListener("click", handleClick);
-
-  function initializeGame(repeat) {
-    let newData = [];
-    for (let count = 0; count < repeat; count++) {
-      newData = [...newData, ...shuffleArray(cardsArray)];
-    }
-    newData = shuffleArray(newData);
-
-    updateData(moves, numberOfMove);
-    updateData(score, numberOfMatch);
-    createGridUi(newData, grid);
+  function randomizeArray(array) {
+    return array
+      .map((item) => ({ ...item, randomKey: Math.random() }))
+      .sort((a, b) => a.randomKey - b.randomKey)
+      .map(({ randomKey, ...item }) => item);
   }
 
-  initializeGame(repeat);
+  function duplicateCards(array, times) {
+    const duplicated = [];
+    for (let i = 0; i < times; i++) {
+      array.forEach((item) => duplicated.push(item));
+    }
+    return duplicated;
+  }
+
+  function initializeGame() {
+    const duplicatedCards = duplicateCards(cardsArray, repeat);
+    const shuffledCards = randomizeArray(duplicatedCards);
+
+    updateStats(movesElement, "Moves", moveCount);
+    updateStats(scoreElement, "Score", matchedPairsCount);
+
+    createGameGrid(shuffledCards, gameContainer);
+  }
+
+  initializeGame();
 }
 
 document.addEventListener("DOMContentLoaded", main);
